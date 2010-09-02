@@ -76,29 +76,21 @@
 
     /**
     * Function that parses an uri string and returns a new Uri object
-    * based on that string. If this function is called on an existing
-    * uri object, the param root does not have to be specified. The
-    * root of the existing uri object will be used.
+    * based on that string.
     *
     * @param {!string} uri The uri string to parse.
-    * @param {?string} root The root segment of the service.
     * @return {OData} A new Uri object.
     */
-    Uri.prototype.parse = function (uri, root) {
+    Uri.prototype.parse = function (uri) {
         var result,
             temp,
             resourcePath,
             queryString,
             index,
-            parts;
-
-        // if root is not specified use 
-        // existing (this) Uri objects root
-        if (root || this instanceof Uri && this.segments && this.segments.root) {
-            root = this.segments.root;
-        } else {
-            throw { name: 'missing argument', message: 'root is not specified' };
-        }
+            root = this.segments.root,
+            parts,
+            opts,
+            length;
 
         // Instanciate a new Uri object to put result in.
         result = new Uri(root);
@@ -144,13 +136,17 @@
         // look for $value option at the end of the 
         // resource path and strip it away if it exists
         parts = resourcePath.split('/$value');
-        result.segments.value = parts.length === 2;
+        if (parts.length === 2) {
+            result.segments.value = true;
+        }
         resourcePath = parts[0];
 
         // look for $count option at the end of the 
         // resource path and strip it away if it exists
         parts = resourcePath.split('/$count');
-        result.segments.count = parts.length === 2;
+        if (parts.length === 2) {
+            result.segments.count = true;
+        }
         resourcePath = parts[0];
 
         // look for $links only if $value was not
@@ -158,57 +154,66 @@
         // be used at the same time
         if (!result.segments.value && (parts = resourcePath.split('/$links/')).length === 2) {
             // we are done with resouce path part now
-            result.segments.resource = parts[0];
+            result.segments.resource = trimSlashes(trim(parts[0]));
             result.segments.links = parts[1];
         } else {
-            result.segments.resource = resourcePath;
+            result.segments.resource = trimSlashes(trim(resourcePath));
         }
 
         // parse query string part of uri
         if (queryString !== undefined && queryString.length > 0) {
+
             // first split query string in different parts.
             parts = queryString.split('&');
-            // split individual parts on '='
-            for (index = 0; index < parts.length; index += 1) {
-                parts[index] = parts[index].split('=');
+
+            // cache length of parts array 
+            length = parts.length;
+
+            // create options object in segments
+            if (length) {
+                result.segments.options = {};
             }
-            // add each part to right them.segment object
-            while (parts.length > 0) {
-                temp = parts.pop();
+
+            // cache options object for better optimization 
+            opts = result.segments.options;
+
+            // split individual parts on '=' and add to options object
+            for (index = 0; index < length; index += 1) {
+                temp = parts[index].split('=');
                 switch (temp[0]) {
                     case '$orderby':
-                        result.segments.options.orderby = temp[1];
+                        opts.orderby = temp[1];
                         break;
                     case '$top':
-                        result.segments.options.top = temp[1];
+                        opts.top = parseInt(temp[1], 10);
                         break;
                     case '$skip':
-                        result.segments.options.skip = temp[1];
+                        opts.skip = parseInt(temp[1], 10);
                         break;
                     case '$filter':
-                        result.segments.options.filter = temp[1];
+                        opts.filter = temp[1];
                         break;
                     case '$expand':
-                        result.segments.options.expand = temp[1];
+                        opts.expand = temp[1];
                         break;
                     case '$select':
-                        result.segments.options.select = temp[1];
+                        opts.select = temp[1];
                         break;
                     case '$skiptoken':
-                        result.segments.options.skiptoken = temp[1];
+                        opts.skiptoken = temp[1];
                         break;
                     case '$inlinecount':
-                        result.segments.options.inlinecount = temp[1] === 'allpages';
+                        opts.inlinecount = temp[1] === 'allpages';
                         break;
                     case '$format':
-                        result.segments.options.format = temp[1];
+                        opts.format = temp[1];
                         break;
                     default:
                         // catch custom parameters and service operation parameters
-                        if (result.segments.options.params === null) {
-                            result.segments.options.params = {};
+                        if (!opts.params) {
+                            opts.params = {};
                         }
-                        result.segments.options.params[temp[0]] = temp[1];
+                        opts.params[temp[0]] = temp[1];
                         break;
                 }
             }
@@ -224,7 +229,7 @@
     Uri.prototype.stringify = function () {
         var opt,
             segs,
-            p,
+            key,
             needAmpersand = false,
             resourcePath,
             qopts = '';
@@ -238,7 +243,7 @@
         }
 
         // start out with just the resouce path, if that is defined.        
-        resourcePath = !segs.resource ? trimSlashes(trim(segs.resource)) : '';
+        resourcePath = segs.resource || '';
 
         // start of extended part of resource path
 
