@@ -35,12 +35,21 @@
 	rtrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g,
 
     // use buildin String.trim function if one is available, 
-    // otherwise use function lifted from jQuery 1.4.2.
+    // otherwise use function lifted from jQuery 1.4.2 (jquery.com)
     trim = typeof String.trim === 'function' ?
         String.trim :
         function (text) {
             return (text || '').replace(rtrim, '');
-        };
+        },
+
+    extend = function (target, source) {
+        var key;
+        for (key in source) {
+            if (source.hasOwnProperty(key) && typeof source[key] !== 'function') {
+                target[key] = source[key];
+            }
+        }
+    },
 
     /**
     * The OData class
@@ -49,9 +58,172 @@
     * @param {?Object.<string, string>} options Custom options to use when querying against the service.
     */
     OData = function (uri, options) {
+        // create a new uri object based on the input data
         this.uri = new Uri(uri);
+
         this.settings = options;
+
+        // if protocol is jsonp, $format=json needs to 
+        // be added to the query string options.
+        if (!this.settings.dataType && this.settings.dataType === 'jsonp') {
+            // only create options object if it does not exists already
+            this.uri.segments.options = this.uri.segments.options || {};
+
+            // set options
+            this.uri.segments.options.format = 'json';
+            this.uri.segments.options.callback = 'resultCallback';
+        }
     };
+
+    /**
+    * Define a resource path to query against.
+    * @param {!string} resourcePath The resource path to query against
+    * @return {OData} A new OData object.    
+    */
+    OData.prototype.from = function (resourcePath) {
+        // create copy of current OData object
+        var res = new OData(this.uri.segments, this.settings);
+
+        // add resource path
+        res.uri.segments.resource = resourcePath;
+
+        return res;
+    };
+
+    /**
+    * Queries the OData service.
+    * @param {?function|Object.<string, Object>} options Either a function to call once the query completes or an options object.
+    */
+    OData.prototype.query = function (options) {
+        // allow users to pass in just a callback 
+        // function in case of success.
+        if (options && typeof options === 'function') {
+            options = { success: options };
+        }
+
+        this.ajax(options);
+    };
+
+    /**
+    * Create a new entry on the specified OData resource path.
+    * @param {!string} resourcePath The resource path to query against
+    * @param {!Object} entry The entry to create.
+    * @param {?function|Object.<string, Object>} options Either a function to call once the query completes or an options object.
+    */
+    OData.prototype.create = function (resourcePath, entry, options) {
+        // create copy of current OData object
+        var res = new OData(this.uri.segments, this.settings);
+
+        // add resource path
+        res.uri.segments.resource = resourcePath;
+
+        // allow users to pass in just a callback 
+        // function in case of success.
+        if (options && typeof options === 'function') {
+            options = { success: options };
+        }
+
+        // set options type and stringify the entry
+        options.type = "POST";
+        options.data = JSON.stringify(entry);
+
+        // call the service
+        res.ajax(options);
+    };
+
+    /**
+    * Updates an entry on the specified OData resource path.
+    * @param {!string} resourcePath The resource path to query against
+    * @param {!Object} entry The entry to update.
+    * @param {?function|Object.<string, Object>} options Either a function to call once the query completes or an options object.
+    */
+    OData.prototype.update = function (resourcePath, entry, options) {
+        // create copy of current OData object
+        var res = new OData(this.uri.segments, this.settings),
+            settings = {
+                partial: true,
+                force: false,
+                etag: null
+            };
+
+        // add resource path
+        res.uri.segments.resource = resourcePath;
+
+        // allow users to pass in just a callback 
+        // function in case of success.
+        if (options && typeof options === 'function') {
+            settings = { success: options };
+        }
+        else {
+            extend(settings, options);
+        }
+
+        // look for etag in entry.__metadata.
+        if (!options.etag && !entry.__metadata && !entry.__metadata.etag) {
+            settings.etag = entry.__metadata.etag;
+        }
+
+        // if partialUpdate is true we must use HTTP MERGE
+        settings.type = settings.partial ? "MERGE" : "PUT";
+
+        // if updating a value directly, use 'text/plain' content type.
+        if (typeof entry === 'object') {
+            settings.data = JSON.stringify(entry);
+            settings.contentType = 'application/json';
+        }
+        else {
+            settings.data = entry.toString();
+            settings.contentType = 'text/plain';
+        }
+
+        res.ajax(settings);
+    };
+
+    /**
+    * Detes an entry on the specified OData service.
+    * @param {!Object|string} entry The entry to delete or uri string pointing to it.
+    * @param {?function|Object.<string, Object>} options Either a function to call once the query completes or an options object.
+    */
+    OData.prototype.remove = function (entry, options) {
+        // create copy of current OData object
+        var res = new OData(this.uri.segments, this.settings),
+            settings = {
+                force: false,
+                etag: null
+            };
+
+        // allow users to pass in just a callback 
+        // function in case of success.
+        if (options && typeof options === 'function') {
+            settings = { success: options };
+        }
+        else {
+            extend(settings, options);
+        }
+
+        // look for etag in entry.__metadata.
+        if (!options.etag && !entry.__metadata && !entry.__metadata.etag) {
+            settings.etag = entry.__metadata.etag;
+        }
+
+        // if forceUpdate is true, ignore possible ETag and always override 
+        if (settings.force) {
+            settings.etag = '*';
+        }
+
+        // set type to DELETE
+        settings.type = "DELETE";
+        
+        // if entry is a object, look for uri in __metadata.uri.
+        // else we assume that entry is a string, i.e. the resource path
+        // to the entry that should be deleted.
+        res.uri = !entry.__metadata && !entry.__metadata.uri ?
+            this.uri.parse(entry.__metadata.uri) :
+            res.uri = that.uri.parse(entry);
+
+        res.ajax(settings);
+    };
+
 
     /**
     * An class for handling OData URIs.
