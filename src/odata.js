@@ -1,11 +1,8 @@
-﻿"use strict";
+﻿/*jslint browser: true, devel: true, onevar: true, undef: true, eqeqeq: true, plusplus: true, bitwise: true, regexp: true, newcap: true, immed: true, strict: true */
+"use strict";
 
-// uri builder
-// request builder
-// response handler 
-// query options
-(function (window, undefined) {
-    var OData, Uri,
+(function (window) {
+    var ODataQuery, Uri,
 
     // Used for trimming slashes from begining and end of string.
     rtrimSlashes = /^\/+|\/+$/g,
@@ -49,6 +46,7 @@
                 target[key] = source[key];
             }
         }
+        return target;
     },
 
     /**
@@ -58,14 +56,15 @@
     * @param {?Object.<string, string>} options Custom options to use when querying against the service.
     */
     OData = function (uri, options) {
-        // create a new uri object based on the input data
-        this.uri = new Uri(uri);
+        // use uri object or create a new 
+        // uri object based on the input data
+        this.uri = uri instanceof Uri ? uri : new Uri(uri);
 
         this.settings = options;
 
         // if protocol is jsonp, $format=json needs to 
         // be added to the query string options.
-        if (!this.settings.dataType && this.settings.dataType === 'jsonp') {
+        if (this.settings && this.settings.dataType && this.settings.dataType === 'jsonp') {
             // only create options object if it does not exists already
             this.uri.segments.options = this.uri.segments.options || {};
 
@@ -75,6 +74,14 @@
         }
     };
 
+    OData.prototype.clone = function(){
+        var clonedUri = this.uri.clone(),
+            clonedSettings = extend({}, this.settings),
+            res = new OData(clonedUri);
+        res.settings = clonedSettings;
+        return res;
+    };
+
     /**
     * Define a resource path to query against.
     * @param {!string} resourcePath The resource path to query against
@@ -82,7 +89,7 @@
     */
     OData.prototype.from = function (resourcePath) {
         // create copy of current OData object
-        var res = new OData(this.uri.segments, this.settings);
+        var res = this.clone();
 
         // add resource path
         res.uri.segments.resource = resourcePath;
@@ -112,7 +119,7 @@
     */
     OData.prototype.create = function (resourcePath, entry, options) {
         // create copy of current OData object
-        var res = new OData(this.uri.segments, this.settings);
+        var res = this.clone();
 
         // add resource path
         res.uri.segments.resource = resourcePath;
@@ -139,7 +146,7 @@
     */
     OData.prototype.update = function (resourcePath, entry, options) {
         // create copy of current OData object
-        var res = new OData(this.uri.segments, this.settings),
+        var res = this.clone(),
             settings = {
                 partial: true,
                 force: false,
@@ -186,7 +193,7 @@
     */
     OData.prototype.remove = function (entry, options) {
         // create copy of current OData object
-        var res = new OData(this.uri.segments, this.settings),
+        var res = this.clone(),
             settings = {
                 force: false,
                 etag: null
@@ -219,7 +226,7 @@
         // to the entry that should be deleted.
         res.uri = !entry.__metadata && !entry.__metadata.uri ?
             this.uri.parse(entry.__metadata.uri) :
-            res.uri = that.uri.parse(entry);
+            res.uri = this.uri.parse(entry);
 
         res.ajax(settings);
     };
@@ -247,11 +254,21 @@
     };
 
     /**
+    * Function that returnes an exact copy of this Uri object.
+    *
+    * @return {Uri} A new Uri object.
+    */
+    Uri.prototype.clone = function(){
+        var clonedSegments = extend({}, this.segments);
+        return new Uri(clonedSegments);
+    };
+
+    /**
     * Function that parses an uri string and returns a new Uri object
     * based on that string.
     *
     * @param {!string} uri The uri string to parse.
-    * @return {OData} A new Uri object.
+    * @return {Uri} A new Uri object.
     */
     Uri.prototype.parse = function (uri) {
         var result,
@@ -492,6 +509,14 @@
     };
 
     /**
+    * 
+    * @param {!OData} odata 
+    */
+    ODataQuery = function(odata){
+        this.prototype = odata;
+    };
+
+    /**
     * Function that creates a new OData object.
     * @param {!string} uri The uri of the service to query against.
     * @param {?Object.<string, string>} options Custom options to use when querying against the service.
@@ -500,4 +525,4 @@
     window.oData = function (uri, options) {
         return new OData(uri, options);
     };
-})(window);
+}(window));

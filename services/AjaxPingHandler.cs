@@ -25,8 +25,11 @@ namespace ODataJS.services
             }
 
             // set content type to json
-            response.ContentType = "application/json";
-            
+            if (request.AcceptTypes.Contains("application/json"))
+                response.ContentType = "application/json";    
+            else
+                response.ContentType = "text/javascript";
+
             // wrap in d object to avoid script injection
             jsonText = "{\"d\":{" + jsonText.Substring(1, jsonText.Length - 1) + "}";
 
