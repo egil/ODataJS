@@ -220,7 +220,7 @@
     */
     OData.prototype.from = function (resourcePath) {
         // add/replace resource path
-        this.uri.segments.resource = resourcePath;
+        this.uri.segments.resource = trimSlashes(resourcePath);
         return this;
     };
 
@@ -244,6 +244,7 @@
     * @return {OData} This OData object.  
     */
     OData.prototype.orderby = function (orderbyQueryOption) {
+        this.uri.segments.options = this.uri.segments.options || {};
         this.uri.segments.options.orderby = orderbyQueryOption;
         return this;
     };
@@ -256,6 +257,7 @@
     * @return {OData} This OData object.  
     */
     OData.prototype.top = function (numberOfEntries) {
+        this.uri.segments.options = this.uri.segments.options || {};
         this.uri.segments.options.top = numberOfEntries;
         return this;
     };
@@ -266,6 +268,7 @@
     * @return {OData} This OData object.  
     */
     OData.prototype.skip = function (numberOfEntries) {
+        this.uri.segments.options = this.uri.segments.options || {};
         this.uri.segments.options.skip = numberOfEntries;
         return this;
     };
@@ -277,6 +280,7 @@
     * @return {OData} This OData object.  
     */
     OData.prototype.filter = function (filter) {
+        this.uri.segments.options = this.uri.segments.options || {};
         this.uri.segments.options.filter = filter;
         return this;
     };
@@ -294,7 +298,8 @@
     * @return {OData} This OData object.  
     */
     OData.prototype.expand = function (entries) {
-        this.uri.segments.options.expand = entries;
+        this.uri.segments.options = this.uri.segments.options || {};
+        this.uri.segments.options.expand =  trimSlashes(entries);
         return this;
     };
 
@@ -305,6 +310,11 @@
     * @return {OData} This OData object.  
     */
     OData.prototype.select = function (properties) {
+        if(properties === '*'){
+            return this;
+        }
+        
+        this.uri.segments.options = this.uri.segments.options || {};
         this.uri.segments.options.select = properties;
         return this;
     };
@@ -315,10 +325,13 @@
     * @param {!string} properties
     * @return {OData} This OData object.  
     */
-    OData.prototype.inlinecount = function (inlinecount) {
-        // set default value if inlinecount argument is not specified
-        inlinecount = inlinecount === undefined ? true : inlinecount;
-        this.uri.segments.options.inlinecount = inlinecount;
+    OData.prototype.inlinecount = function (inlinecount) {        
+        if(inlinecount === false || inlinecount === 'none'){
+            return this;
+        }
+        
+        this.uri.segments.options = this.uri.segments.options || {};
+        this.uri.segments.options.inlinecount = true;
         return this;
     };
 
@@ -329,6 +342,7 @@
     * @return {OData} This OData object.  
     */
     OData.prototype.params = function (params) {
+        this.uri.segments.options = this.uri.segments.options || {};
         this.uri.segments.options.params = params;
         return this;
     };
@@ -405,6 +419,16 @@
             this.segments = {};
             this.segments.root = input;
         }
+
+        // trim slashes away from resource path if present
+        if(this.segments.resource && typeof this.segments.resource === 'string') {
+            this.segments.resource = trimSlashes(this.segments.resource);
+        }
+
+        // trim slashes away from expand if present
+        if(this.segments.options && this.segments.options.expand && typeof this.segments.options.expand === 'string') {            
+            this.segments.options.expand =  trimSlashes(this.segments.options.expand);
+        }        
 
         // make sure we have a root element
         if (!this.segments.root) {

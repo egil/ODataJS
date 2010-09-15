@@ -59,8 +59,8 @@
     <Content Include="src\odata-compiled.js" />
     <Content Include="src\odata.js" />
     <Content Include="tests\odata-clone.js" />
-    <Content Include="tests\testrunner-github.html" />
-    <Content Include="tests\testrunner-local.html" />
+    <Content Include="tests\odata-query-functions.js" />
+    <Content Include="tests\testrunner.html" />
     <Content Include="tests\uri-parse-stringify.js" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
