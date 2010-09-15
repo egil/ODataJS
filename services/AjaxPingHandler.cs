@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Json;
 using System.Text;
@@ -25,10 +23,9 @@ namespace ODataJS.services
             }
 
             // set content type to json
-            if (request.AcceptTypes.Contains("application/json"))
-                response.ContentType = "application/json";    
-            else
-                response.ContentType = "text/javascript";
+            response.ContentType = request.AcceptTypes.Contains("application/json") ? 
+				"application/json" : 
+				"text/javascript";
 
             // wrap in d object to avoid script injection
             jsonText = "{\"d\":{" + jsonText.Substring(1, jsonText.Length - 1) + "}";

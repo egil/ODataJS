@@ -74,26 +74,15 @@
         }
     };
 
-    OData.prototype.clone = function(){
-        var clonedUri = this.uri.clone(),
-            clonedSettings = extend({}, this.settings),
-            res = new OData(clonedUri);
-        res.settings = clonedSettings;
-        return res;
-    };
-
     /**
-    * Define a resource path to query against.
-    * @param {!string} resourcePath The resource path to query against
+    * Create an exact clone of this OData object.    
     * @return {OData} A new OData object.    
     */
-    OData.prototype.from = function (resourcePath) {
-        // create copy of current OData object
-        var res = this.clone();
-
-        // add resource path
-        res.uri.segments.resource = resourcePath;
-
+    OData.prototype.clone = function () {
+        var clonedUri = this.uri.clone(),
+            clonedSettings,
+            res = new OData(clonedUri);
+        res.settings = this.settings ? extend({}, this.settings) : undefined;
         return res;
     };
 
@@ -118,11 +107,8 @@
     * @param {?function|Object.<string, Object>} options Either a function to call once the query completes or an options object.
     */
     OData.prototype.create = function (resourcePath, entry, options) {
-        // create copy of current OData object
-        var res = this.clone();
-
-        // add resource path
-        res.uri.segments.resource = resourcePath;
+        // add/replace resource path
+        this.uri.segments.resource = resourcePath;
 
         // allow users to pass in just a callback 
         // function in case of success.
@@ -135,7 +121,7 @@
         options.data = JSON.stringify(entry);
 
         // call the service
-        res.ajax(options);
+        this.ajax(options);
     };
 
     /**
@@ -145,16 +131,14 @@
     * @param {?function|Object.<string, Object>} options Either a function to call once the query completes or an options object.
     */
     OData.prototype.update = function (resourcePath, entry, options) {
-        // create copy of current OData object
-        var res = this.clone(),
-            settings = {
-                partial: true,
-                force: false,
-                etag: null
-            };
+        var settings = {
+            partial: true,
+            force: false,
+            etag: null
+        };
 
         // add resource path
-        res.uri.segments.resource = resourcePath;
+        this.uri.segments.resource = resourcePath;
 
         // allow users to pass in just a callback 
         // function in case of success.
@@ -183,7 +167,7 @@
             settings.contentType = 'text/plain';
         }
 
-        res.ajax(settings);
+        this.ajax(settings);
     };
 
     /**
@@ -192,12 +176,10 @@
     * @param {?function|Object.<string, Object>} options Either a function to call once the query completes or an options object.
     */
     OData.prototype.remove = function (entry, options) {
-        // create copy of current OData object
-        var res = this.clone(),
-            settings = {
-                force: false,
-                etag: null
-            };
+        var settings = {
+            force: false,
+            etag: null
+        };
 
         // allow users to pass in just a callback 
         // function in case of success.
@@ -220,17 +202,194 @@
 
         // set type to DELETE
         settings.type = "DELETE";
-        
+
         // if entry is a object, look for uri in __metadata.uri.
         // else we assume that entry is a string, i.e. the resource path
         // to the entry that should be deleted.
-        res.uri = !entry.__metadata && !entry.__metadata.uri ?
+        this.uri = !entry.__metadata && !entry.__metadata.uri ?
             this.uri.parse(entry.__metadata.uri) :
-            res.uri = this.uri.parse(entry);
+            this.uri = this.uri.parse(entry);
 
-        res.ajax(settings);
+        this.ajax(settings);
     };
 
+    /**
+    * Define a resource path to query against.
+    * @param {!string} resourcePath The resource path to query against
+    * @return {OData} A new OData object.    
+    */
+    OData.prototype.from = function (resourcePath) {
+        // add/replace resource path
+        this.uri.segments.resource = resourcePath;
+        return this;
+    };
+
+    /**
+    * Retrive URIs for the specified navigation property.
+    * @param {!string} navigationProperty The navigation property to traverse
+    * @return {OData} This OData object.    
+    */
+    OData.prototype.links = function (navigationProperty) {
+        this.uri.segments.links = navigationProperty;
+        return this;
+    };
+
+    /**
+    * The orderby System Query Option specifies an expression for determining 
+    * what values are used to order the collection of Entries identified by 
+    * the Resource Path section of the URI.
+    *
+    * Note: This query option is only supported when the resource path identifies a Collection of Entries.
+    * @param {!string} orderbyQueryOption The order by clause.
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.orderby = function (orderbyQueryOption) {
+        this.uri.segments.options.orderby = orderbyQueryOption;
+        return this;
+    };
+
+    /**
+    * Specify the maximum amount of entries to return from the 
+    * Collection of Entries identified by the Resource Path in this query object.
+    *
+    * @param {!Number} numberOfEntries The maximum number of entries to retrive.
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.top = function (numberOfEntries) {
+        this.uri.segments.options.top = numberOfEntries;
+        return this;
+    };
+
+    /**
+    * Specify the amount of entries to skip in the resultset.
+    * @param {!Number} numberOfEntries The number of entries to skip.
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.skip = function (numberOfEntries) {
+        this.uri.segments.options.skip = numberOfEntries;
+        return this;
+    };
+
+    /**
+    * A filter expression used to filter out entries in the resultset.
+    *
+    * @param {!string} filter A valid OData filter expression string.
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.filter = function (filter) {
+        this.uri.segments.options.filter = filter;
+        return this;
+    };
+
+    /**
+    * Indicate that Entries associated with the Entry or Collection 
+    * of Entries identified by the Resource Path section of the 
+    * URI must be represented inline (i.e. eagerly loaded).
+    *
+    * @param {!string} entries The syntax of a $expand query option 
+    *   is a comma-separated list of Navigation Properties. 
+    *   Additionally each Navigation Property can be followed 
+    *   by a forward slash and another Navigation Property to 
+    *   enable identifying a multi-level relationship.
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.expand = function (entries) {
+        this.uri.segments.options.expand = entries;
+        return this;
+    };
+
+    /**
+    * A comma seperated list of properties to return.
+    *
+    * @param {!string} properties
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.select = function (properties) {
+        this.uri.segments.options.select = properties;
+        return this;
+    };
+
+    /**
+    * Specify that the server should return the total number of entires in the result set.
+    *
+    * @param {!string} properties
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.inlinecount = function (inlinecount) {
+        // set default value if inlinecount argument is not specified
+        inlinecount = inlinecount === undefined ? true : inlinecount;
+        this.uri.segments.options.inlinecount = inlinecount;
+        return this;
+    };
+
+    /**
+    * Assign Service Operations parameters to this OData Query object.
+    *
+    * @param {!object} params
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.params = function (params) {
+        this.uri.segments.options.params = params;
+        return this;
+    };
+
+    /**
+    * Retrives the number of entries associated resource path.
+    *
+    * @param {object|function|Boolean} args
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.count = function (args) {
+        var autoQuery = true,
+            options = args;
+
+        if (typeof args === 'boolean') {
+            autoQuery = args;
+        } else if (typeof options === 'function') {
+            options = { success: args };
+        } else if (args === undefined) {
+            autoQuery = false;
+        }
+
+        // add count query string to query options object
+        this.uri.segments.count = true;
+
+        if (autoQuery) {
+            this.ajax(options);
+        }
+        else {
+            return this;
+        }
+    };
+
+    /**
+    * Retrives the "raw value" of the specified property.
+    *
+    * @param {object|function|Boolean} args
+    * @return {OData} This OData object.  
+    */
+    OData.prototype.value = function (args) {
+        var autoQuery = true,
+            options = args;
+
+        if (typeof args === 'boolean') {
+            autoQuery = args;
+        } else if (typeof options === 'function') {
+            options = { success: args };
+        } else if (args === undefined) {
+            autoQuery = false;
+        }
+        // add value query string to query options object
+        this.uri.segments.value = true;
+
+        if (autoQuery) {
+            // execute the query
+            this.ajax(options);
+        }
+        else {
+            return this;
+        }
+    };
 
     /**
     * An class for handling OData URIs.
@@ -255,10 +414,9 @@
 
     /**
     * Function that returnes an exact copy of this Uri object.
-    *
     * @return {Uri} A new Uri object.
     */
-    Uri.prototype.clone = function(){
+    Uri.prototype.clone = function () {
         var clonedSegments = extend({}, this.segments);
         return new Uri(clonedSegments);
     };
@@ -509,14 +667,6 @@
     };
 
     /**
-    * 
-    * @param {!OData} odata 
-    */
-    ODataQuery = function(odata){
-        this.prototype = odata;
-    };
-
-    /**
     * Function that creates a new OData object.
     * @param {!string} uri The uri of the service to query against.
     * @param {?Object.<string, string>} options Custom options to use when querying against the service.
@@ -525,4 +675,4 @@
     window.oData = function (uri, options) {
         return new OData(uri, options);
     };
-}(window));
+} (window));

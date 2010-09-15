@@ -21,7 +21,9 @@ namespace ODataJS.services
         {
             foreach (string key in _dict.Keys)
             {
-                info.AddValue(key, _dict[key], _dict[key] == null ? typeof(object) : _dict[key].GetType());
+                info.AddValue(key, _dict[key], _dict[key] == null ? 
+					typeof(object) : 
+					_dict[key].GetType());
             }
         }
 
